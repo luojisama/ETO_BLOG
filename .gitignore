@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local data (persisted via Redis/KV in production)
+/data/*.json
+/data/friend-circle-cache.json
+
+# editor / agent local configs
+/.claude/
+/.idea/
+/.vscode/
