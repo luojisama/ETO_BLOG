@@ -18,6 +18,8 @@ export interface PostMeta {
   description: string;
   tags?: string[];
   readingTime?: number; // minutes
+  /** Cover image — relative to /public or full URL. Shown on /posts list + post header. */
+  cover?: string;
 }
 
 export interface Post extends PostMeta {
@@ -252,6 +254,27 @@ async function processMarkdown(content: string): Promise<string> {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+/** Normalize frontmatter date to "YYYY-MM-DD" string (gray-matter may parse bare dates as Date objects) */
+function normalizeDate(raw: unknown): string {
+  if (!raw) return "";
+  if (raw instanceof Date) {
+    // ISO date in local-ish format; use UTC parts to avoid timezone drift
+    const y = raw.getUTCFullYear();
+    const m = String(raw.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(raw.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return String(raw);
+}
+
+/** Pick cover URL — accepts either `cover` or fuwari-style `image` frontmatter key, ignores empty strings. */
+function pickCover(data: Record<string, unknown>): string | undefined {
+  const raw = data.cover ?? data.image;
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 export function getAllPosts(): PostMeta[] {
   if (!fs.existsSync(postsDirectory)) return [];
   return fs
@@ -265,10 +288,11 @@ export function getAllPosts(): PostMeta[] {
       return {
         slug,
         title: data.title || slug,
-        date: data.date || "",
+        date: normalizeDate(data.date),
         description: data.description || "",
         tags: data.tags || [],
         readingTime: estimateReadingTime(content),
+        cover: pickCover(data),
       };
     })
     .sort((a, b) => (a.date > b.date ? -1 : 1));
@@ -281,10 +305,11 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
   return {
     slug,
     title: data.title || slug,
-    date: data.date || "",
+    date: normalizeDate(data.date),
     description: data.description || "",
     tags: data.tags || [],
     readingTime: estimateReadingTime(content),
+    cover: pickCover(data),
     contentHtml: await processMarkdown(content),
     rawContent: content,
   };
@@ -316,10 +341,11 @@ export function searchPosts(query: string): PostMeta[] {
             {
               slug,
               title: data.title || slug,
-              date: data.date || "",
+              date: normalizeDate(data.date),
               description: data.description || "",
               tags: data.tags || [],
               readingTime: estimateReadingTime(content),
+              cover: pickCover(data),
             },
           ]
         : [];
